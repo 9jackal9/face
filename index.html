@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>안면 표정 기반 심리 및 행동 양상 분석 시스템</title>
+    <!-- PDF 변환 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- 얼굴 인식 및 표정 분석 라이브러리 (face-api.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <!-- 웹 폰트 추가 (학술적 분위기를 위한 명조/고딕 체) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Noto Sans KR', sans-serif; 
+            background-color: #f4f6f8; 
+            color: #212529; 
+            padding: 40px 20px; 
+            line-height: 1.6;
+        }
+        .container { 
+            max-width: 750px; 
+            margin: 0 auto; 
+            background: #ffffff; 
+            padding: 50px 60px; 
+            border: 1px solid #ced4da; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03); 
+        }
+        .header-section {
+            text-align: center;
+            border-bottom: 2px solid #212529;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        h1, h2, h3, .serif-text { 
+            font-family: 'Noto Serif KR', serif; 
+        }
+        h1 { 
+            color: #1a1a1a; 
+            font-size: 26px; 
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+        }
+        .sub-title { 
+            color: #495057; 
+            font-size: 0.95em; 
+            letter-spacing: 0.5px;
+        }
+        .report-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-top: 15px;
+            border-top: 1px solid #e9ecef;
+            padding-top: 10px;
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        #loading { 
+            color: #0056b3; 
+            font-weight: 500; 
+            text-align: center;
+            margin: 20px 0; 
+            display: none; 
+        }
+        .upload-btn-wrapper { 
+            text-align: center;
+            position: relative; 
+            overflow: hidden; 
+            display: block; 
+            margin: 30px 0; 
+        }
+        .btn-upload, button { 
+            background-color: #343a40; 
+            color: #ffffff; 
+            border: 1px solid #212529; 
+            padding: 10px 24px; 
+            font-family: 'Noto Sans KR', sans-serif;
+            font-size: 15px; 
+            cursor: pointer; 
+            transition: all 0.2s ease-in-out; 
+            border-radius: 2px;
+        }
+        .upload-btn-wrapper input[type=file] { 
+            font-size: 100px; 
+            position: absolute; 
+            left: 0; 
+            top: 0; 
+            opacity: 0; 
+            cursor: pointer; 
+            height: 100%; 
+        }
+        .btn-upload:hover, button:hover:not(:disabled) { 
+            background-color: #212529; 
+        }
+        button:disabled { 
+            background-color: #e9ecef; 
+            border-color: #ced4da;
+            color: #adb5bd;
+            cursor: not-allowed; 
+        }
+        #image-container { 
+            text-align: center;
+            margin-bottom: 20px; 
+        }
+        #preview { 
+            max-width: 100%; 
+            max-height: 350px; 
+            display: none; 
+            border: 1px solid #dee2e6;
+            padding: 4px;
+            background: #f8f9fa;
+        }
+        .action-buttons {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        #result-area { 
+            display: none; 
+            margin-top: 40px; 
+            padding: 40px; 
+            border: 1px solid #dee2e6; 
+            background-color: #fdfdfd; 
+        }
+        .result-header {
+            text-align: center; 
+            margin-bottom: 35px;
+        }
+        .result-header h2 {
+            color: #1a1a1a;
+            font-size: 22px;
+            margin-bottom: 20px;
+        }
+        .emotion-badge { 
+            display: inline-block; 
+            padding: 8px 20px; 
+            border: 1px solid #343a40;
+            background-color: #ffffff; 
+            color: #1a1a1a; 
+            font-family: 'Noto Serif KR', serif;
+            font-weight: 600; 
+            font-size: 14px;
+        }
+        .result-item { 
+            margin-bottom: 25px; 
+        }
+        .result-item h3 { 
+            margin: 0 0 12px 0; 
+            color: #1a1a1a; 
+            font-size: 1.1em; 
+            border-left: 3px solid #343a40;
+            padding-left: 12px;
+        }
+        .result-item p { 
+            margin: 0; 
+            color: #343a40; 
+            font-size: 0.95em;
+            text-align: justify;
+            word-break: keep-all;
+            line-height: 1.7;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-section">
+        <h1>안면 표정 기반 심리 및 행동 양상 분석</h1>
+        <p class="sub-title">Facial Expression-Based Psychological & Behavioral Analysis</p>
+        <div class="report-meta">
+            <span>연구 목적: 심리 추론 및 행동 예측 (엔터테인먼트)</span>
+            <span id="current-date"></span>
+        </div>
+    </div>
+
+    <div id="loading">데이터 모델을 초기화 중입니다. 잠시만 기다려주십시오...</div>
+
+    <div class="upload-btn-wrapper" id="upload-wrapper" style="display:none;">
+        <button class="btn-upload">분석 대상 사진 업로드</button>
+        <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
+    </div>
+
+    <div id="image-container">
+        <img id="preview" alt="업로드된 사진">
+    </div>
+
+    <div class="action-buttons">
+        <button id="analyzeBtn" onclick="analyzeExpression()" style="display:none;">심리 분석 알고리즘 실행</button>
+    </div>
+
+    <!-- 분석 결과 영역 -->
+    <div id="result-area">
+        <div class="result-header">
+            <h2>분석 결과 보고서</h2>
+            <div class="emotion-badge" id="detected-emotion">주요 감지 표정: </div>
+        </div>
+
+        <div class="result-item">
+            <h3>I. 현재 심리 상태 및 성격 추론</h3>
+            <p id="res-personality"></p>
+        </div>
+        <div class="result-item">
+            <h3>II. 과거(청소년기) 행동 양상 분석</h3>
+            <p id="res-behavior"></p>
+        </div>
+        <div class="result-item">
+            <h3>III. 학업 성취 및 학습 스타일</h3>
+            <p id="res-grades"></p>
+        </div>
+        <div class="result-item">
+            <h3>IV. 대인 관계 및 이성 교제</h3>
+            <p id="res-romance"></p>
+        </div>
+        <div class="result-item">
+            <h3>V. 규칙 준수 및 일탈 성향</h3>
+            <p id="res-trouble"></p>
+        </div>
+    </div>
+    
+    <div class="action-buttons" style="margin-top: 30px;">
+        <button id="downloadBtn" onclick="downloadPDF()" style="display:none;">결과 보고서 다운로드 (PDF)</button>
+    </div>
+</div>
+
+<script>
+    // 날짜 자동 입력
+    document.getElementById('current-date').innerText = '분석일: ' + new Date().toLocaleDateString();
+
+    let isModelLoaded = false;
+
+    // AI 모델 데이터 로드 (Github 원격 저장소 이용)
+    async function loadModels() {
+        const loadingEl = document.getElementById('loading');
+        loadingEl.style.display = 'block';
+        try {
+            // face-api 모델 가중치 파일 로드
+            const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
+            await Promise.all([
+                faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+            ]);
+            isModelLoaded = true;
+            loadingEl.style.display = 'none';
+            document.getElementById('upload-wrapper').style.display = 'inline-block';
+        } catch (error) {
+            loadingEl.innerText = "🚨 모델 로드에 실패했습니다. 인터넷 연결을 확인해주세요.";
+            console.error(error);
+        }
+    }
+
+    // 페이지 로드 시 모델 불러오기 실행
+    window.onload = loadModels;
+
+    // 이미지 업로드 핸들러
+    function handleImageUpload(event) {
+        if (!isModelLoaded) {
+            alert("시스템 모델이 아직 로드되지 않았습니다. 잠시 후 다시 시도해주십시오.");
+            return;
+        }
+        const file = event.target.files[0];
+        if (file) {
+            const img = document.getElementById('preview');
+            img.src = URL.createObjectURL(file);
+            img.style.display = 'inline-block';
+            
+            // 결과창 초기화
+            document.getElementById('result-area').style.display = 'none';
+            document.getElementById('downloadBtn').style.display = 'none';
+            
+            // 이미지 로드 완료 후 분석 버튼 표시
+            img.onload = () => {
+                document.getElementById('analyzeBtn').style.display = 'inline-block';
+                document.getElementById('analyzeBtn').innerText = "심리 분석 알고리즘 실행";
+                document.getElementById('analyzeBtn').disabled = false;
+            }
+        }
+    }
+
+    // 표정 분석 및 결과 생성
+    async function analyzeExpression() {
+        const imgEl = document.getElementById('preview');
+        const btn = document.getElementById('analyzeBtn');
+        
+        btn.innerText = "데이터 분석 중...";
+        btn.disabled = true;
+
+        try {
+            // 얼굴 및 표정 감지 실행
+            const detection = await faceapi.detectSingleFace(imgEl).withFaceExpressions();
+            
+            if (!detection) {
+                alert("피험자의 얼굴 특성을 추출할 수 없습니다. 정면이 명확히 보이는 사진을 사용해 주십시오.");
+                btn.innerText = "심리 분석 알고리즘 실행";
+                btn.disabled = false;
+                return;
+            }
+
+            // 가장 확률이 높은 감정 추출
+            const expressions = detection.expressions;
+            let dominantEmotion = Object.keys(expressions).reduce((a, b) => expressions[a] > expressions[b] ? a : b);
+            
+            generateResults(dominantEmotion);
+
+        } catch (error) {
+            alert("분석 중 시스템 오류가 발생했습니다.");
+            console.error(error);
+        }
+
+        btn.style.display = 'none';
+    }
+
+    // 감정에 따른 결과 텍스트 매칭
+    function generateResults(emotion) {
+        let emotionKr = "";
+        let data = {};
+
+        // 감정에 따른 데이터 세트 설정 (학술적 톤)
+        switch(emotion) {
+            case 'happy':
+                emotionKr = "긍정적 정서 상태 (기쁨/미소)";
+                data = {
+                    personality: "현재 피험자는 높은 수준의 긍정적 에너지를 발산하고 있습니다. 타인과의 상호작용을 선호하며, 낙천적이고 외향적인 성향이 두드러지는 것으로 분석됩니다.",
+                    behavior: "청소년기에는 또래 집단 내에서 주도적인 역할을 수행했을 가능성이 높습니다. 높은 사교성을 바탕으로 조직의 분위기를 활기차게 주도하는 성향을 보였을 것입니다.",
+                    grades: "학습에 있어서는 내재적 동기에 크게 좌우되는 경향이 관찰됩니다. 흥미를 느끼는 과목에서는 우수한 성취도를 보이나, 비선호 과목과의 편차가 존재했을 수 있습니다.",
+                    romance: "다정하고 유쾌한 성격적 특성으로 인해 대인 관계가 원만하며, 이성에게 높은 호감도를 얻었을 것으로 유추됩니다.",
+                    trouble: "심각한 규정 위반보다는 권위주의적 환경에 대한 가벼운 저항이나, 또래와의 유대를 위한 사소한 규칙 위반(예: 수업 중 대화 등) 정도의 행동이 관찰되었을 것입니다."
+                };
+                break;
+            case 'sad':
+            case 'fearful':
+                emotionKr = "부정적 정서 상태 (우울/긴장)";
+                data = {
+                    personality: "피험자는 현재 감수성이 예민해져 있거나, 내면적 성찰이 활발한 상태로 분석됩니다. 다소 신중하고 정서적으로 안정감이 필요한 상태일 수 있습니다.",
+                    behavior: "청소년기에는 외부로 에너지를 발산하기보다는 내향적인 성향이 강했을 것으로 추정됩니다. 소수의 인원과 깊은 유대관계를 형성하는 것을 선호했을 것입니다.",
+                    grades: "꼼꼼하고 체계적인 학습 태도를 갖추고 있어, 학업 성취에 있어 꾸준함과 높은 집중력을 요구하는 암기 및 논리 기반 과목에서 우수한 결과를 보였을 것입니다.",
+                    romance: "이성 교제에 있어서는 매우 신중한 태도를 취하며, 감정을 적극적으로 표현하기보다는 장기간 관찰하며 애착을 형성하는 방식을 선호했을 가능성이 큽니다.",
+                    trouble: "일반적으로 규범을 잘 준수하는 모범적인 행동 양상을 보였으며, 규정 위반으로 인한 갈등 상황 자체를 회피하려는 성향이 강했을 것입니다."
+                };
+                break;
+            case 'angry':
+            case 'disgusted':
+                emotionKr = "높은 각성 및 의지 상태 (분노/혐오)";
+                data = {
+                    personality: "주관이 뚜렷하고 자아 개념이 확고한 상태로 분석됩니다. 목표 지향적이며, 불합리한 상황에 대해 비판적으로 사고하는 성향이 강하게 나타납니다.",
+                    behavior: "집단 내에서 리더십을 발휘하거나 자신의 의견을 논리적으로 피력하는 데 주저함이 없었을 것입니다. 토론이나 의사결정 과정에서 주도권을 가지려는 경향이 있습니다.",
+                    grades: "높은 성취 욕구와 승부욕을 바탕으로, 경쟁 상황에서 학업 성취도가 급격히 향상되는 양상을 보였을 것입니다. 목표한 바를 이루기 위해 강한 집중력을 발휘하는 타입입니다.",
+                    romance: "타인을 평가하는 기준이 명확하여 쉽게 관계를 시작하지 않으나, 일단 신뢰 관계가 형성되면 매우 헌신적이고 책임감 있는 태도를 유지했을 것으로 추정됩니다.",
+                    trouble: "권위자의 불합리한 지시에 대해 논리적으로 반문하거나, 기존 체제에 대해 비판적인 태도를 취함으로써 기성 세대(교사 등)와 가벼운 마찰을 겪었을 가능성이 존재합니다."
+                };
+                break;
+            case 'surprised':
+                emotionKr = "높은 인지적 각성 (놀람/흥미)";
+                data = {
+                    personality: "외부 자극에 대한 수용성이 높고, 새로운 정보에 대해 강한 지적 호기심을 보이는 성향입니다. 인지적 유연성이 뛰어나고 반응 속도가 빠른 편입니다.",
+                    behavior: "주변 환경의 변화에 민감하게 반응하며, 정보 탐색에 많은 시간을 할애했을 것입니다. 다양한 분야에 관심이 많아 취미 활동이나 교우 관계 폭이 넓었을 가능성이 큽니다.",
+                    grades: "지속적인 집중을 요구하는 환경보다는, 단기간에 고도의 집중력을 발휘하는 환경에서 유리한 성향입니다. 이른바 '벼락치기'와 같은 효율성 위주의 학습 전략을 주로 사용했을 것입니다.",
+                    romance: "새로운 대상에 대해 빠르게 흥미를 느끼고 호감을 형성하는 경향이 있으며, 감정 표현에 비교적 솔직하고 개방적인 태도를 보였을 것으로 분석됩니다.",
+                    trouble: "의도적인 악의보다는 호기심이나 충동적인 행동으로 인해 학교 규정을 위반하는 사례가 종종 발생했을 수 있습니다. 주의력 분산에 기인한 사소한 실수가 잦았을 수 있습니다."
+                };
+                break;
+            case 'neutral':
+            default:
+                emotionKr = "정서적 평온 상태 (무표정/중립)";
+                data = {
+                    personality: "피험자는 현재 감정적 동요가 적고 심리적 안정성이 높은 상태입니다. 상황을 객관적이고 이성적으로 판단하려는 분석적 성향이 강하게 나타납니다.",
+                    behavior: "감정 표현을 자제하고 차분한 태도를 유지하는 편이나, 상황에 대한 통찰력이 뛰어나 적절한 시점에 핵심적인 발언을 함으로써 존재감을 드러냈을 것입니다.",
+                    grades: "정서적 안정감을 바탕으로 기복 없는 학업 수행 능력을 보여주었을 것입니다. 꾸준한 학습 루틴을 유지하며 장기적인 목표 달성에 유리한 학업 스타일을 지녔습니다.",
+                    romance: "감정적 소모가 큰 관계보다는, 서로의 독립성을 존중하며 정신적 유대감을 중시하는 안정적인 이성 교제를 선호했을 가능성이 높습니다.",
+                    trouble: "주어진 규율의 테두리 안에서 자신만의 공간과 여유를 찾는 방법을 잘 알고 있어, 교묘하게 감시망을 피하는 능숙함을 보였을 것으로 추론됩니다."
+                };
+                break;
+        }
+
+        // 결과 화면에 적용
+        document.getElementById('detected-emotion').innerText = `주요 감지 표정: ${emotionKr}`;
+        document.getElementById('res-personality').innerText = data.personality;
+        document.getElementById('res-behavior').innerText = data.behavior;
+        document.getElementById('res-grades').innerText = data.grades;
+        document.getElementById('res-romance').innerText = data.romance;
+        document.getElementById('res-trouble').innerText = data.trouble;
+
+        // 결과 및 다운로드 버튼 표시
+        document.getElementById('result-area').style.display = 'block';
+        document.getElementById('downloadBtn').style.display = 'inline-block';
+    }
+
+    // PDF 다운로드 함수
+    function downloadPDF() {
+        const element = document.getElementById('result-area');
+        const opt = {
+            margin:       15,
+            filename:     '심리_행동양상_분석보고서.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        
+        html2pdf().set(opt).from(element).save();
+    }
+</script>
+
+</body>
+</html>
